@@ -1,0 +1,5 @@
+openai>=1.0.0
+clarifai>=11.6.0
+Pillow>=10.0.0
+numpy
+opencv-python

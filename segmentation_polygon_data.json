@@ -1,0 +1,30 @@
+{
+  "metadata": {
+    "image_file": "./samples/airplane.png",
+    "extraction_timestamp": "2025-07-31T21:01:18.748816",
+    "total_regions": 2,
+    "coordinate_system": "normalized (0.0 to 1.0)"
+  },
+  "regions": [
+    {
+      "region_id": 1,
+      "concepts": [
+        {
+          "name": "sky-other",
+          "confidence": 0.7902297973632812
+        }
+      ],
+      "geometry": {}
+    },
+    {
+      "region_id": 2,
+      "concepts": [
+        {
+          "name": "airplane",
+          "confidence": 0.20977020263671875
+        }
+      ],
+      "geometry": {}
+    }
+  ]
+}

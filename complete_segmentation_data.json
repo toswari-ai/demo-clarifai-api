@@ -1,0 +1,97 @@
+{
+  "metadata": {
+    "image_file": "https://tf-cmsv2-smithsonianmag-media.s3.amazonaws.com/filer/ea/21/ea2159df-9eec-4b05-a3de-356c57e23227/another_airplane_4676723312.jpg",
+    "extraction_timestamp": "2025-07-31T22:06:29.409382",
+    "total_regions": 3,
+    "coordinate_system": "normalized (0.0 to 1.0)",
+    "data_types": [
+      "masks",
+      "polygons",
+      "bounding_boxes"
+    ],
+    "note": "Complete segmentation data from Clarifai visual segmentation model"
+  },
+  "regions": [
+    {
+      "region_id": 1,
+      "concepts": [
+        {
+          "name": "sky-other",
+          "confidence": 0.8531150817871094
+        }
+      ],
+      "segmentation": {
+        "mask": {
+          "type": "base64_image",
+          "data_length": 13659,
+          "format": "base64 encoded binary mask",
+          "decode_instructions": "Use PIL: Image.open(BytesIO(base64.b64decode(mask_data)))"
+        },
+        "bounding_box": {
+          "type": "bounding_box",
+          "left_col": 0.0,
+          "top_row": 0.0,
+          "right_col": 0.0,
+          "bottom_row": 0.0,
+          "width": 0.0,
+          "height": 0.0,
+          "area_normalized": 0.0
+        }
+      }
+    },
+    {
+      "region_id": 2,
+      "concepts": [
+        {
+          "name": "airplane",
+          "confidence": 0.11600112915039062
+        }
+      ],
+      "segmentation": {
+        "mask": {
+          "type": "base64_image",
+          "data_length": 12484,
+          "format": "base64 encoded binary mask",
+          "decode_instructions": "Use PIL: Image.open(BytesIO(base64.b64decode(mask_data)))"
+        },
+        "bounding_box": {
+          "type": "bounding_box",
+          "left_col": 0.0,
+          "top_row": 0.0,
+          "right_col": 0.0,
+          "bottom_row": 0.0,
+          "width": 0.0,
+          "height": 0.0,
+          "area_normalized": 0.0
+        }
+      }
+    },
+    {
+      "region_id": 3,
+      "concepts": [
+        {
+          "name": "clouds",
+          "confidence": 0.0308837890625
+        }
+      ],
+      "segmentation": {
+        "mask": {
+          "type": "base64_image",
+          "data_length": 12190,
+          "format": "base64 encoded binary mask",
+          "decode_instructions": "Use PIL: Image.open(BytesIO(base64.b64decode(mask_data)))"
+        },
+        "bounding_box": {
+          "type": "bounding_box",
+          "left_col": 0.0,
+          "top_row": 0.0,
+          "right_col": 0.0,
+          "bottom_row": 0.0,
+          "width": 0.0,
+          "height": 0.0,
+          "area_normalized": 0.0
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "metadata": {
+    "extraction_timestamp": "2025-07-31T22:06:29.405510",
+    "clarifai_model_prediction": "raw_api_response",
+    "note": "This is the complete JSON response from Clarifai's prediction API"
+  },
+  "prediction_response": {
+    "message": "Raw prediction object doesn't have to_dict() method",
+    "type": "<class 'proto.clarifai.api.service_pb2.MultiOutputResponse'>",
+    "available_attributes": [
+      "ByteSize",
+      "Clear",
+      "ClearExtension",
+      "ClearField",
+      "CopyFrom",
+      "DESCRIPTOR",
+      "DiscardUnknownFields",
+      "FindInitializationErrors",
+      "FromString",
+      "HasExtension",
+      "HasField",
+      "IsInitialized",
+      "ListFields",
+      "MergeFrom",
+      "MergeFromString",
+      "ParseFromString",
+      "SerializePartialToString",
+      "SerializeToString",
+      "SetInParent",
+      "UnknownFields",
+      "WhichOneof",
+      "outputs",
+      "runner_selector",
+      "status"
+    ]
+  }
+}

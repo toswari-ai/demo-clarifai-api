@@ -756,6 +756,7 @@ def visualize_masks_on_image(image_source, regions, save_path=None, source_type=
     # Extract masks and concepts from regions using Clarifai's working sample code
     masks = []
     concepts = []
+    confidences = []
     
     for region in regions:
         # Filter regions with sufficient confidence (following Clarifai documentation)
@@ -772,6 +773,7 @@ def visualize_masks_on_image(image_source, regions, save_path=None, source_type=
                             mask_array = np.array(mask_image)
                             masks.append(mask_array)
                             concepts.append(region.data.concepts[0].name)
+                            confidences.append(region.data.concepts[0].value)
                             print(f"✅ Processed mask for: {region.data.concepts[0].name} - Shape: {mask_array.shape}")
                         except Exception as mask_error:
                             print(f"⚠️  Could not process mask for {region.data.concepts[0].name}: {mask_error}")
@@ -822,11 +824,13 @@ def visualize_masks_on_image(image_source, regions, save_path=None, source_type=
         overlays.append(overlay)
     
     # Overlay masks on original image with enhanced alpha blending for better contrast
+    # Only apply high-confidence masks initially (≥0.6)
     overlayed = np.copy(img_array)
     
-    for overlay in overlays:
-        # Apply stronger alpha blending (30% overlay, 70% original) for better visibility
-        cv2.addWeighted(overlay, 0.30, overlayed, 0.70, 0, overlayed)
+    for i, overlay in enumerate(overlays):
+        if confidences[i] >= 0.6:  # Only show high-confidence masks initially
+            # Apply stronger alpha blending (30% overlay, 70% original) for better visibility
+            cv2.addWeighted(overlay, 0.30, overlayed, 0.70, 0, overlayed)
     
     # Enhance contrast and brightness more aggressively
     overlayed = cv2.convertScaleAbs(overlayed, alpha=1.6, beta=60)
@@ -855,7 +859,8 @@ def visualize_masks_on_image(image_source, regions, save_path=None, source_type=
     ax3.axis('off')
     
     # State management for interactive legend
-    mask_visibility = [True] * len(overlays)  # All masks visible by default
+    # Only show masks with confidence >= 0.6 by default
+    mask_visibility = [confidences[i] >= 0.6 for i in range(len(overlays))]
     original_overlayed = np.copy(overlayed)   # Store original overlayed image
     
     def update_display():
@@ -895,16 +900,17 @@ def visualize_masks_on_image(image_source, regions, save_path=None, source_type=
             # Convert BGR to RGB for matplotlib and normalize to 0-1
             color_rgb = [colors[i][2]/255, colors[i][1]/255, colors[i][0]/255]
             concept = concepts[i]
+            confidence = confidences[i]
             
             # Modify appearance based on visibility
             if mask_visibility[i]:
-                # Visible: full color with "ON" indicator
-                patch = mpatches.Patch(color=color_rgb, label=f"✅ {concept}")
+                # Visible: full color with "ON" indicator and confidence
+                patch = mpatches.Patch(color=color_rgb, label=f"✅ {concept} ({confidence:.2f})")
                 alpha = 1.0
             else:
-                # Hidden: grayed out with "OFF" indicator  
+                # Hidden: grayed out with "OFF" indicator and confidence 
                 gray_color = [0.7, 0.7, 0.7]  # Light gray
-                patch = mpatches.Patch(color=gray_color, label=f"❌ {concept}")
+                patch = mpatches.Patch(color=gray_color, label=f"❌ {concept} ({confidence:.2f})")
                 alpha = 0.5
             
             legend_patches.append(patch)
@@ -961,7 +967,8 @@ def visualize_masks_on_image(image_source, regions, save_path=None, source_type=
                         
                         # Print feedback
                         status = "ON" if mask_visibility[item_index] else "OFF"
-                        print(f"🎭 Toggled {concepts[item_index]} mask: {status}")
+                        confidence = confidences[item_index]
+                        print(f"🎭 Toggled {concepts[item_index]} ({confidence:.2f}) mask: {status}")
                         
                         # Update display
                         update_display()
@@ -985,11 +992,13 @@ def visualize_masks_on_image(image_source, regions, save_path=None, source_type=
     print("=" * 70)
     for i, concept in enumerate(concepts):
         color_rgb = f"RGB({colors[i][2]}, {colors[i][1]}, {colors[i][0]})"
-        print(f"🎭 Mask {i+1}: {concept} - Color: {color_rgb}")
+        confidence = confidences[i]
+        print(f"🎭 Mask {i+1}: {concept} ({confidence:.3f}) - Color: {color_rgb}")
     print(f"🔥 Applied 30% mask opacity with enhanced contrast (alpha=1.6, beta=60)")
-    print(f"📊 Interactive legend with click-to-toggle functionality")
+    print(f"📊 Interactive legend with click-to-toggle functionality and confidence scores")
     print(f"💡 Click legend items to show/hide individual masks")
-    print(f"✅ All masks are visible by default")
+    print(f"✅ High-confidence masks (≥0.6) are visible by default, low-confidence masks are hidden")
+    print(f"🎯 Confidence threshold: Only masks with confidence ≥ 0.60 are shown initially")
     
     # Determine if we should save the image
     backend = matplotlib.get_backend()

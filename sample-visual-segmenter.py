@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Clarifai Visual Segmentation Demo with Image Viewer
+Clarifai Visual Segmentation Demo - Text Analysis Only
 
 This script demonstrates how to use Clarifai's image segmentation model to identify
 and analyze different segments/regions within an image. Image segmentation is the
@@ -10,269 +10,167 @@ different objects or parts of objects.
 Features:
 - Downloads and analyzes images using Clarifai's segmentation API
 - Displays detailed text results with confidence scores
-- Shows visual comparison between original image and segmented regions
-- Draws bounding boxes with labels for each detected region
-- Color-coded visualization for easy interpretation
+- Shows polygon and bounding box coordinate information
+- Provides comprehensive region analysis in text format
 
 For more information about Clarifai's visual models, visit:
 https://docs.clarifai.com/getting-started/quickstart
 
 Author: Clarifai
 Last Updated: 2025
-Requirements: clarifai>=11.6.0, matplotlib>=3.5.0, Pillow>=10.0.0, requests
+Requirements: clarifai>=11.6.0, requests
 """
 
 # Import necessary libraries
 from clarifai.client.model import Model  # Clarifai's Model class for API interactions
 import os  # For accessing environment variables
 import requests  # For downloading images from URLs
-from PIL import Image, ImageDraw, ImageFont  # For image processing and visualization
-import numpy as np  # For numerical operations
 from io import BytesIO  # For handling image data in memory
 
-# Configure matplotlib for different environments
-import matplotlib
-import matplotlib.pyplot as plt  # For displaying images
-import matplotlib.patches as patches  # For drawing rectangles on images
-
-# Try to use a GUI backend, fallback to non-interactive if not available
-try:
-    matplotlib.use('TkAgg')  # Try GUI backend first
-except:
-    try:
-        matplotlib.use('Qt5Agg')  # Try Qt backend
-    except:
-        matplotlib.use('Agg')  # Use non-interactive backend as fallback
-        print("ℹ️  Using non-interactive display mode (images will be saved instead of displayed)")
-
 # =============================================================================
-# IMAGE VISUALIZATION FUNCTIONS
+# REGION ANALYSIS FUNCTIONS
 # =============================================================================
-def download_image(url):
+def debug_region_structure(regions):
     """
-    Download an image from a URL and return it as a PIL Image object.
+    Debug function to inspect the structure of region data from Clarifai.
+    This helps understand what data is available for analysis.
     
     Args:
-        url (str): The URL of the image to download
-        
-    Returns:
-        PIL.Image: The downloaded image
-    """
-    try:
-        response = requests.get(url)
-        response.raise_for_status()  # Raise an exception for bad status codes
-        return Image.open(BytesIO(response.content))
-    except Exception as e:
-        print(f"❌ Error downloading image: {e}")
-        return None
-
-def draw_segmentation_regions(image, regions, show_labels=True):
-    """
-    Draw bounding boxes and labels for segmentation regions on an image.
-    
-    Args:
-        image (PIL.Image): The original image
         regions (list): List of region objects from Clarifai prediction
-        show_labels (bool): Whether to show concept labels on the image
-        
-    Returns:
-        tuple: (PIL.Image with regions drawn, list of color mappings)
     """
-    # Create a copy of the image to draw on
-    img_with_regions = image.copy()
-    draw = ImageDraw.Draw(img_with_regions)
+    print(f"\n🔍 DEBUG: Analyzing {len(regions)} regions...")
     
-    # Try to use a default font, fall back to default if not available
-    try:
-        font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 16)
-    except:
-        try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", 16)
-        except:
-            font = ImageFont.load_default()
-    
-    # Enhanced color palette with distinct colors for better visibility
-    colors = [
-        '#FF0000',  # Bright Red
-        '#0000FF',  # Bright Blue  
-        '#00FF00',  # Bright Green
-        '#FF00FF',  # Magenta
-        '#00FFFF',  # Cyan
-        '#FFA500',  # Orange
-        '#800080',  # Purple
-        '#FFFF00',  # Yellow
-        '#FF69B4',  # Hot Pink
-        '#32CD32',  # Lime Green
-        '#FFD700',  # Gold
-        '#8A2BE2',  # Blue Violet
-        '#DC143C',  # Crimson
-        '#20B2AA',  # Light Sea Green
-        '#FF6347',  # Tomato
-        '#4682B4',  # Steel Blue
-    ]
-    
-    # Store color mappings for legend
-    color_mappings = []
-    
-    for i, region in enumerate(regions):
-        # Get bounding box coordinates if available
-        if hasattr(region.region_info, 'bounding_box'):
-            bbox = region.region_info.bounding_box
+    for i, region in enumerate(regions[:2]):  # Show first 2 regions as examples
+        print(f"\n--- Region {i+1} Debug Info ---")
+        print(f"Region type: {type(region)}")
+        
+        # Check region_info
+        if hasattr(region, 'region_info'):
+            print(f"✅ Has region_info: {type(region.region_info)}")
             
-            # Convert normalized coordinates to pixel coordinates
-            img_width, img_height = image.size
-            left = int(bbox.left_col * img_width)
-            top = int(bbox.top_row * img_height)
-            right = int(bbox.right_col * img_width)
-            bottom = int(bbox.bottom_row * img_height)
-            
-            # Choose unique color for this region
-            color = colors[i % len(colors)]
-            
-            # Draw bounding box with thicker border for better visibility
-            draw.rectangle([left, top, right, bottom], outline=color, width=4)
-            
-            # Get the top concept for this region
-            if region.data.concepts:
-                top_concept = region.data.concepts[0]
-                concept_name = top_concept.name
-                confidence = top_concept.value
-                
-                # Store color mapping
-                color_mappings.append({
-                    'region_id': i + 1,
-                    'color': color,
-                    'concept': concept_name,
-                    'confidence': confidence
-                })
-                
-                if show_labels:
-                    label = f"R{i+1}: {concept_name} ({confidence:.2f})"
-                    
-                    # Calculate text size for background
-                    text_bbox = draw.textbbox((left, top-30), label, font=font)
-                    text_width = text_bbox[2] - text_bbox[0]
-                    text_height = text_bbox[3] - text_bbox[1]
-                    
-                    # Draw label background with some padding
-                    draw.rectangle([left-2, top-32, left+text_width+4, top-2], fill=color)
-                    
-                    # Draw label text in white for contrast
-                    draw.text((left, top-30), label, fill='white', font=font)
+            # Check for polygon
+            if hasattr(region.region_info, 'polygon'):
+                polygon = region.region_info.polygon
+                if polygon and hasattr(polygon, 'points'):
+                    print(f"✅ Has polygon with {len(polygon.points)} points")
+                    if len(polygon.points) > 0:
+                        first_point = polygon.points[0]
+                        print(f"   First point: col={first_point.col:.3f}, row={first_point.row:.3f}")
+                else:
+                    print("❌ Polygon is None or has no points")
             else:
-                # Store color mapping even if no concepts
-                color_mappings.append({
-                    'region_id': i + 1,
-                    'color': color,
-                    'concept': 'Unknown',
-                    'confidence': 0.0
-                })
+                print("❌ No polygon attribute")
+            
+            # Check for bounding_box
+            if hasattr(region.region_info, 'bounding_box'):
+                bbox = region.region_info.bounding_box
+                print(f"✅ Has bounding_box: ({bbox.left_col:.3f}, {bbox.top_row:.3f}) to ({bbox.right_col:.3f}, {bbox.bottom_row:.3f})")
+            else:
+                print("❌ No bounding_box attribute")
+        else:
+            print("❌ No region_info attribute")
+        
+        # Check concepts
+        if hasattr(region, 'data') and hasattr(region.data, 'concepts'):
+            print(f"✅ Has {len(region.data.concepts)} concepts")
+            if len(region.data.concepts) > 0:
+                top_concept = region.data.concepts[0]
+                print(f"   Top concept: {top_concept.name} ({top_concept.value:.3f})")
+        else:
+            print("❌ No concepts data")
     
-    return img_with_regions, color_mappings
+    print("--- End Debug Info ---\n")
 
-def visualize_segmentation_results(image_url, regions, save_path=None):
+def analyze_polygon_geometry(regions):
     """
-    Create a visualization showing the original image and segmented regions with color legend.
+    Analyze polygon geometry and provide detailed information about shapes.
     
     Args:
-        image_url (str): URL of the original image
         regions (list): List of region objects from Clarifai prediction
-        save_path (str, optional): Path to save the visualization. If None, auto-generates.
     """
-    # Download the original image
-    print("📥 Downloading image for visualization...")
-    original_image = download_image(image_url)
+    print("\n📐 POLYGON GEOMETRY ANALYSIS")
+    print("=" * 50)
     
-    if original_image is None:
-        print("❌ Could not download image for visualization")
-        return
+    for i, region in enumerate(regions, 1):
+        if hasattr(region.region_info, 'polygon') and region.region_info.polygon:
+            polygon_points = region.region_info.polygon.points
+            
+            # Calculate polygon area (approximate using shoelace formula)
+            if len(polygon_points) >= 3:
+                area = 0.0
+                n = len(polygon_points)
+                for j in range(n):
+                    k = (j + 1) % n
+                    area += polygon_points[j].col * polygon_points[k].row
+                    area -= polygon_points[k].col * polygon_points[j].row
+                area = abs(area) / 2.0
+                
+                # Calculate perimeter (approximate)
+                perimeter = 0.0
+                for j in range(n):
+                    k = (j + 1) % n
+                    dx = polygon_points[k].col - polygon_points[j].col
+                    dy = polygon_points[k].row - polygon_points[j].row
+                    perimeter += (dx*dx + dy*dy)**0.5
+                
+                print(f"\n🔺 Region {i} Polygon Analysis:")
+                print(f"   • Vertices: {len(polygon_points)}")
+                print(f"   • Approximate Area: {area:.4f} (normalized units)")
+                print(f"   • Approximate Perimeter: {perimeter:.4f} (normalized units)")
+                
+                # Show all vertices
+                print(f"   • Vertices coordinates:")
+                for j, point in enumerate(polygon_points):
+                    print(f"     [{j+1}] ({point.col:.4f}, {point.row:.4f})")
+                    
+        elif hasattr(region.region_info, 'bounding_box'):
+            bbox = region.region_info.bounding_box
+            width = bbox.right_col - bbox.left_col
+            height = bbox.bottom_row - bbox.top_row
+            area = width * height
+            
+            print(f"\n📦 Region {i} Bounding Box Analysis:")
+            print(f"   • Width: {width:.4f} (normalized units)")
+            print(f"   • Height: {height:.4f} (normalized units)")
+            print(f"   • Area: {area:.4f} (normalized units)")
+            print(f"   • Top-Left: ({bbox.left_col:.4f}, {bbox.top_row:.4f})")
+            print(f"   • Bottom-Right: ({bbox.right_col:.4f}, {bbox.bottom_row:.4f})")
+
+def download_image_info(url):
+    """
+    Get basic information about an image from URL without downloading the full content.
     
-    # Create image with segmentation regions and get color mappings
-    segmented_image, color_mappings = draw_segmentation_regions(original_image, regions)
-    
-    # Create a figure with three subplots: original, segmented, and legend
-    fig = plt.figure(figsize=(20, 8))
-    
-    # Create a grid layout: 2 columns for images, 1 for legend
-    gs = fig.add_gridspec(2, 3, width_ratios=[1, 1, 0.5], height_ratios=[1, 0.1])
-    
-    # Original image subplot
-    ax1 = fig.add_subplot(gs[:, 0])
-    ax1.imshow(original_image)
-    ax1.set_title('Original Image', fontsize=16, fontweight='bold', pad=20)
-    ax1.axis('off')
-    
-    # Segmented image subplot
-    ax2 = fig.add_subplot(gs[:, 1])
-    ax2.imshow(segmented_image)
-    ax2.set_title('Segmented Regions', fontsize=16, fontweight='bold', pad=20)
-    ax2.axis('off')
-    
-    # Legend subplot
-    ax3 = fig.add_subplot(gs[:, 2])
-    ax3.axis('off')
-    ax3.set_title('Region Legend', fontsize=14, fontweight='bold', pad=20)
-    
-    # Create color legend
-    legend_y_start = 0.95
-    legend_y_step = 0.08
-    
-    for i, mapping in enumerate(color_mappings):
-        y_pos = legend_y_start - (i * legend_y_step)
+    Args:
+        url (str): The URL of the image
         
-        # Draw color square
-        color_square = plt.Rectangle((0.1, y_pos-0.02), 0.1, 0.04, 
-                                   facecolor=mapping['color'], 
-                                   edgecolor='black', linewidth=1)
-        ax3.add_patch(color_square)
-        
-        # Add text description
-        text = f"R{mapping['region_id']}: {mapping['concept']}\n     ({mapping['confidence']:.2f})"
-        ax3.text(0.25, y_pos, text, fontsize=10, va='center', ha='left')
-    
-    # Set legend limits
-    ax3.set_xlim(0, 1)
-    ax3.set_ylim(0, 1)
-    
-    # Add main title
-    fig.suptitle('Clarifai Image Segmentation Results with Color-Coded Regions', 
-                fontsize=18, fontweight='bold', y=0.95)
-    
-    # Adjust layout
-    plt.tight_layout()
-    
-    # Print color mapping to console
-    print("\n🎨 Region Color Mapping:")
-    print("=" * 60)
-    for mapping in color_mappings:
-        print(f"🔷 Region {mapping['region_id']} ({mapping['color']}): {mapping['concept']} "
-              f"({mapping['confidence']:.2f} confidence)")
-    
-    # Determine if we should save the image
-    backend = matplotlib.get_backend()
-    if save_path is None and backend == 'Agg':
-        # Non-interactive backend, auto-save
-        save_path = "segmentation_results_with_legend.png"
-    
-    # Save if path provided or if using non-interactive backend
-    if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"💾 Visualization saved to: {save_path}")
-    
-    # Try to display the plot
+    Returns:
+        dict: Basic image information
+    """
     try:
-        if backend != 'Agg':
-            plt.show()
-            print("🖼️  Visualization displayed! Close the window to continue.")
-        else:
-            print("🖼️  Visualization saved as image file (display not available in this environment)")
+        # Make a HEAD request to get headers without downloading content
+        response = requests.head(url)
+        response.raise_for_status()
+        
+        info = {
+            'url': url,
+            'content_type': response.headers.get('content-type', 'unknown'),
+            'content_length': response.headers.get('content-length', 'unknown'),
+            'status': 'accessible'
+        }
+        
+        print(f"� Image Information:")
+        print(f"   • URL: {url}")
+        print(f"   • Content Type: {info['content_type']}")
+        if info['content_length'] != 'unknown':
+            size_kb = int(info['content_length']) / 1024
+            print(f"   • File Size: {size_kb:.1f} KB")
+        print(f"   • Status: {info['status']}")
+        
+        return info
+        
     except Exception as e:
-        print(f"⚠️  Could not display visualization: {e}")
-        if not save_path:
-            plt.savefig("segmentation_results_with_legend.png", dpi=300, bbox_inches='tight')
-            print("💾 Saved visualization to: segmentation_results_with_legend.png")
-    
-    plt.close()  # Clean up the figure
+        print(f"❌ Error accessing image: {e}")
+        return {'url': url, 'status': 'error', 'error': str(e)}
 
 # =============================================================================
 # SECURITY SETUP: Get API credentials from environment variables
@@ -320,10 +218,13 @@ model_prediction = Model(url=model_url, pat=pat).predict_by_url(image_url)
 # Each region has concepts (what was detected) with confidence values
 regions = model_prediction.outputs[0].data.regions
 
+# Debug: Show region structure to understand the data format
+debug_region_structure(regions)
+
 print(f"\n🎯 Found {len(regions)} segmented regions in the image:")
 print("=" * 50)
 
-# Enhanced color palette (same as in visualization function)
+# Enhanced color palette for region identification in text output
 color_names = [
     'Bright Red', 'Bright Blue', 'Bright Green', 'Magenta', 'Cyan', 
     'Orange', 'Purple', 'Yellow', 'Hot Pink', 'Lime Green', 
@@ -350,24 +251,33 @@ for region_index, region in enumerate(regions, 1):
         print(f"   {rank_symbol} {name}: {confidence} ({confidence * 100:.2f}% confidence)")
     
     # Show region location if available
-    if hasattr(region.region_info, 'bounding_box'):
+    if hasattr(region.region_info, 'polygon') and region.region_info.polygon:
+        polygon_points = region.region_info.polygon.points
+        print(f"      🔺 Polygon with {len(polygon_points)} vertices")
+        # Show first few points as example
+        if len(polygon_points) > 0:
+            first_point = polygon_points[0]
+            print(f"         First vertex: ({first_point.col:.3f}, {first_point.row:.3f})")
+        if len(polygon_points) > 1:
+            second_point = polygon_points[1]
+            print(f"         Second vertex: ({second_point.col:.3f}, {second_point.row:.3f})")
+        if len(polygon_points) > 2:
+            print(f"         ... and {len(polygon_points) - 2} more vertices")
+    elif hasattr(region.region_info, 'bounding_box'):
         bbox = region.region_info.bounding_box
-        print(f"      📍 Location: ({bbox.left_col:.2f}, {bbox.top_row:.2f}) to "
+        print(f"      📍 Bounding box: ({bbox.left_col:.2f}, {bbox.top_row:.2f}) to "
               f"({bbox.right_col:.2f}, {bbox.bottom_row:.2f})")
 
 # =============================================================================
-# VISUAL DISPLAY: Show original image and segmented regions
+# IMAGE ANALYSIS: Get basic image information
 # =============================================================================
-print("\n🎨 Creating visual display of segmentation results...")
-try:
-    # Display the original image alongside the segmented regions
-    # Optionally save the visualization (uncomment the line below to save)
-    # visualize_segmentation_results(image_url, regions, save_path="segmentation_with_color_legend.png")
-    visualize_segmentation_results(image_url, regions)
-except Exception as e:
-    print(f"⚠️  Could not display visualization: {e}")
-    print("   This might happen if you don't have a display available (e.g., in a server environment)")
-    print("   The text results above still show all the segmentation information!")
+print("\n📋 Getting basic image information...")
+image_info = download_image_info(image_url)
+
+# =============================================================================
+# POLYGON GEOMETRY ANALYSIS: Detailed shape analysis
+# =============================================================================
+analyze_polygon_geometry(regions)
 
 # =============================================================================
 # SUMMARY AND NEXT STEPS
@@ -379,17 +289,22 @@ print("   • Each region represents a different part of the image")
 print("   • Concepts show what objects/features were detected in each region")
 print("   • Confidence values indicate how certain the AI is about each detection")
 print("   • Higher values (closer to 1.0) mean higher confidence")
-print("   • Each region has a unique color in the visualization")
-print("   • Color-coded legend shows region-to-prediction mapping")
+print("   • Polygon coordinates show the exact segmented areas")
+print("   • Normalized coordinates range from 0.0 to 1.0 (relative to image size)")
+print("   • Polygon geometry analysis provides area and perimeter calculations")
+print("   • Debug information shows the internal structure of API responses")
 
 print("\n🚀 Try modifying this script:")
 print("   • Change the 'image_url' to analyze your own images")
 print("   • Try different segmentation models from Clarifai's model gallery")
-print("   • Customize the color palette for better visualization")
-print("   • Save the color-coded results by uncommenting the save_path parameter")
 print("   • Experiment with different image formats (JPG, PNG, etc.)")
-print("   • Add region area calculations or other analysis features")
-print("   • Create batch processing for multiple images with color legends")
-print("   • Modify the legend layout or add more detailed region information")
+print("   • Add additional polygon geometry calculations")
+print("   • Create batch processing for multiple images")
+print("   • Export results to JSON or CSV format")
+print("   • Add statistical analysis of region sizes and confidence scores")
+print("   • Implement region filtering based on confidence thresholds")
 
 print(f"\n📚 Learn more at: https://docs.clarifai.com/getting-started/quickstart")
+
+print("\n✅ Text-based segmentation analysis complete!")
+print("� All region data has been processed and displayed in text format.")

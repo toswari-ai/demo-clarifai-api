@@ -340,12 +340,12 @@ python sample-text-to-audio.py
 - Voice assistants
 - Audio content creation
 
-#### Speech-to-Text (`Audio To Text.py`)
+#### Speech-to-Text (`sample-audio-to-text.py`)
 
 **What it does:** Transcribes spoken audio into written text.
 
 ```bash
-python "Audio To Text.py"
+python sample-audio-to-text.py
 ```
 
 **Best for:**
@@ -373,12 +373,12 @@ python sample-super-resolution.py
 - Old photo restoration
 - Image quality improvement
 
-#### Multimodal Processing (`Multimodal To Text.py`)
+#### Multimodal Processing (`sample-multimodal-to-text.py`)
 
 **What it does:** Processes both images and text together for comprehensive understanding.
 
 ```bash
-python "Multimodal To Text.py"
+python sample-multimodal-to-text.py
 ```
 
 **Best for:**

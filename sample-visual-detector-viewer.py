@@ -13,11 +13,13 @@ Features:
 - Shows visual comparison between original image and detected objects
 - Creates colored bounding box overlays for each detected object
 - Interactive zoom and pan functionality for detailed inspection
+- Interactive legend with click-to-toggle detection visibility
 - Large, high-resolution visualization (24x12 inches)
 - Individual detail views showing cropped regions around each detection
 - Color-coded visualization with comprehensive legend
 - Enhanced formatting with object size and position analysis
 - Preserves original image visibility with semi-transparent overlays
+- Real-time detection filtering for focused analysis
 
 This example uses Clarifai's face detection model to find and locate faces
 in an image, providing both identification and precise positioning information.
@@ -74,7 +76,7 @@ def download_image(url):
         print(f"❌ Error downloading image: {e}")
         return None
 
-def draw_detection_boxes(image, regions, show_labels=True):
+def draw_detection_boxes(image, regions, show_labels=True, visible_detections=None):
     """
     Draw colored bounding boxes and labels for detected objects on an image.
     
@@ -82,6 +84,7 @@ def draw_detection_boxes(image, regions, show_labels=True):
         image (PIL.Image): The original image
         regions (list): List of region objects from Clarifai prediction
         show_labels (bool): Whether to show concept labels on the image
+        visible_detections (list): List of detection indices that should be visible (None means all visible)
         
     Returns:
         tuple: (PIL.Image with bounding boxes drawn, list of color mappings)
@@ -125,7 +128,36 @@ def draw_detection_boxes(image, regions, show_labels=True):
     # Store color mappings for legend
     color_mappings = []
     
+    # Default to showing all detections if not specified
+    if visible_detections is None:
+        visible_detections = list(range(len(regions)))
+    
     for i, region in enumerate(regions):
+        # Choose unique color for this detection
+        color_hex = colors[i % len(colors)]
+        
+        # Only draw if this detection is visible
+        if i not in visible_detections:
+            # Still store color mapping but don't draw
+            if region.data.concepts:
+                top_concept = region.data.concepts[0]
+                concept_name = top_concept.name
+                confidence = top_concept.value
+            else:
+                concept_name = 'Unknown'
+                confidence = 0.0
+                
+            if hasattr(region.region_info, 'bounding_box'):
+                color_mappings.append({
+                    'detection_id': i + 1,
+                    'color': color_hex,
+                    'concept': concept_name,
+                    'confidence': confidence,
+                    'bbox': region.region_info.bounding_box,
+                    'visible': False
+                })
+            continue
+        
         # Get bounding box coordinates
         if hasattr(region.region_info, 'bounding_box'):
             bbox = region.region_info.bounding_box
@@ -163,7 +195,8 @@ def draw_detection_boxes(image, regions, show_labels=True):
                     'color': color_hex,
                     'concept': concept_name,
                     'confidence': confidence,
-                    'bbox': bbox
+                    'bbox': bbox,
+                    'visible': True
                 })
                 
                 if show_labels:
@@ -187,7 +220,8 @@ def draw_detection_boxes(image, regions, show_labels=True):
                     'color': color_hex,
                     'concept': 'Unknown',
                     'confidence': 0.0,
-                    'bbox': bbox
+                    'bbox': bbox,
+                    'visible': True
                 })
     
     # Composite the overlay onto the original image
@@ -201,7 +235,7 @@ def draw_detection_boxes(image, regions, show_labels=True):
 def visualize_detection_results(image_url, regions, save_path=None):
     """
     Create a visualization showing the original image and detected objects with bounding boxes.
-    Features larger, zoomable images for better inspection.
+    Features larger, zoomable images for better inspection and interactive legend for toggling detections.
     
     Args:
         image_url (str): URL of the original image
@@ -216,8 +250,11 @@ def visualize_detection_results(image_url, regions, save_path=None):
         print("❌ Could not download image for visualization")
         return
     
+    # Initialize visibility state for all detections
+    visible_detections = list(range(len(regions)))
+    
     # Create image with detection bounding boxes and get color mappings
-    detected_image, color_mappings = draw_detection_boxes(original_image, regions)
+    detected_image, color_mappings = draw_detection_boxes(original_image, regions, visible_detections=visible_detections)
     
     # Create a larger figure with enhanced layout for better viewing
     fig = plt.figure(figsize=(24, 12))  # Much larger figure
@@ -248,51 +285,124 @@ def visualize_detection_results(image_url, regions, save_path=None):
     # Legend subplot
     ax3 = fig.add_subplot(gs[:, 2])
     ax3.axis('off')
-    ax3.set_title('Detection Legend', fontsize=16, fontweight='bold', pad=25)
+    ax3.set_title('Detection Legend (Click to Toggle)', fontsize=16, fontweight='bold', pad=25)
     
-    # Create color legend with enhanced formatting
-    legend_y_start = 0.95
-    legend_y_step = 0.08  # Reduced step for more compact legend
+    # Add interactive functionality
+    def update_visualization():
+        """Update the visualization when detections are toggled"""
+        nonlocal detected_image
+        detected_image, _ = draw_detection_boxes(original_image, regions, visible_detections=visible_detections)
+        ax2.clear()
+        ax2.imshow(detected_image)
+        ax2.set_title('Detected Objects (Zoom/Pan Available)', fontsize=18, fontweight='bold', pad=25)
+        ax2.axis('on')
+        ax2.set_xticks([])
+        ax2.set_yticks([])
+        ax2.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
+        update_legend()
+        fig.canvas.draw()
     
-    for i, mapping in enumerate(color_mappings):
-        y_pos = legend_y_start - (i * legend_y_step)
+    def update_legend():
+        """Update the legend display with current visibility states"""
+        ax3.clear()
+        ax3.axis('off')
+        ax3.set_title('Detection Legend (Click to Toggle)', fontsize=16, fontweight='bold', pad=25)
         
-        # Draw larger color square
-        color_square = plt.Rectangle((0.05, y_pos-0.025), 0.12, 0.05, 
-                                   facecolor=mapping['color'], 
-                                   edgecolor='black', linewidth=1.5)
-        ax3.add_patch(color_square)
+        legend_y_start = 0.95
+        legend_y_step = 0.08
         
-        # Add enhanced text description with bounding box size
-        bbox = mapping['bbox']
-        width = bbox.right_col - bbox.left_col
-        height = bbox.bottom_row - bbox.top_row
-        confidence_pct = mapping['confidence'] * 100
+        for i, mapping in enumerate(color_mappings):
+            y_pos = legend_y_start - (i * legend_y_step)
+            detection_idx = mapping['detection_id'] - 1
+            is_visible = detection_idx in visible_detections
+            
+            # Use different styling for visible/hidden detections
+            alpha = 1.0 if is_visible else 0.3
+            edge_width = 2 if is_visible else 1
+            
+            # Draw color square with visibility indicator
+            color_square = plt.Rectangle((0.05, y_pos-0.025), 0.12, 0.05, 
+                                       facecolor=mapping['color'], alpha=alpha,
+                                       edgecolor='black' if is_visible else 'gray', 
+                                       linewidth=edge_width)
+            ax3.add_patch(color_square)
+            
+            # Add visibility indicator
+            status_icon = "👁️" if is_visible else "👁️‍🗨️"
+            ax3.text(0.01, y_pos, status_icon, fontsize=12, va='center', ha='left')
+            
+            # Add enhanced text description
+            bbox = mapping['bbox']
+            width = bbox.right_col - bbox.left_col
+            height = bbox.bottom_row - bbox.top_row
+            confidence_pct = mapping['confidence'] * 100
+            
+            # Multi-line text with visibility styling
+            text_color = 'black' if is_visible else 'gray'
+            font_weight = 'bold' if is_visible else 'normal'
+            
+            text_lines = [
+                f"D{mapping['detection_id']}: {mapping['concept']}",
+                f"     Conf: {confidence_pct:.1f}%",
+                f"     Size: {width:.2f}×{height:.2f}"
+            ]
+            
+            # Draw each line with proper spacing and styling
+            for j, line in enumerate(text_lines):
+                ax3.text(0.2, y_pos - j*0.015, line, fontsize=10, va='center', ha='left',
+                        fontweight='bold' if j == 0 and is_visible else font_weight,
+                        color=text_color, alpha=alpha)
         
-        # Multi-line text with better formatting
-        text_lines = [
-            f"D{mapping['detection_id']}: {mapping['concept']}",
-            f"     Conf: {confidence_pct:.1f}%",
-            f"     Size: {width:.2f}×{height:.2f}"
-        ]
+        # Add instructions
+        ax3.text(0.5, 0.05, "💡 Click on legend items to\nshow/hide detections", 
+                ha='center', va='bottom', fontsize=10, style='italic',
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.8))
         
-        # Draw each line with proper spacing
-        for j, line in enumerate(text_lines):
-            ax3.text(0.2, y_pos - j*0.015, line, fontsize=10, va='center', ha='left',
-                    fontweight='bold' if j == 0 else 'normal')
+        ax3.set_xlim(0, 1)
+        ax3.set_ylim(0, 1)
     
-    # Set legend limits
-    ax3.set_xlim(0, 1)
-    ax3.set_ylim(0, 1)
+    def on_legend_click(event):
+        """Handle clicks on the legend to toggle detection visibility"""
+        if event.inaxes == ax3:
+            legend_y_start = 0.95
+            legend_y_step = 0.08
+            
+            # Calculate which legend item was clicked
+            for i, mapping in enumerate(color_mappings):
+                y_pos = legend_y_start - (i * legend_y_step)
+                
+                # Check if click is within the legend item area
+                if (0.01 <= event.xdata <= 0.95 and 
+                    y_pos - 0.04 <= event.ydata <= y_pos + 0.025):
+                    
+                    detection_idx = mapping['detection_id'] - 1
+                    
+                    # Toggle visibility
+                    if detection_idx in visible_detections:
+                        visible_detections.remove(detection_idx)
+                        print(f"🔍 Hidden detection {mapping['detection_id']}: {mapping['concept']}")
+                    else:
+                        visible_detections.append(detection_idx)
+                        print(f"👁️ Showing detection {mapping['detection_id']}: {mapping['concept']}")
+                    
+                    # Update the visualization
+                    update_visualization()
+                    break
+    
+    # Initialize the legend display
+    update_legend()
+    
+    # Connect the click event handler
+    fig.canvas.mpl_connect('button_press_event', on_legend_click)
     
     # Add main title with enhanced styling
-    fig.suptitle('Clarifai Object Detection Results - Interactive View (Use Mouse to Zoom/Pan)', 
+    fig.suptitle('Clarifai Object Detection Results - Interactive View (Mouse: Zoom/Pan, Legend: Click to Toggle)', 
                 fontsize=20, fontweight='bold', y=0.96)
     
     # Add instruction text
-    fig.text(0.5, 0.02, 'Instructions: Use mouse wheel to zoom, click and drag to pan. Right-click to reset view.', 
+    fig.text(0.5, 0.02, 'Instructions: Mouse wheel to zoom, click and drag to pan. Click legend items to show/hide detections. Right-click to reset view.', 
              ha='center', va='bottom', fontsize=12, style='italic', 
-             bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.8))
+             bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgreen", alpha=0.8))
     
     # Enable interactive navigation toolbar
     try:
@@ -300,8 +410,10 @@ def visualize_detection_results(image_url, regions, save_path=None):
         from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
         from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
         print("🔍 Interactive zoom and pan enabled - use mouse wheel and drag!")
+        print("👆 Click on legend items to show/hide specific detections!")
     except ImportError:
         print("📝 Basic zoom available - matplotlib navigation may be limited")
+        print("👆 Click on legend items to show/hide specific detections!")
     
     # Adjust layout with more spacing
     plt.tight_layout(rect=[0, 0.05, 1, 0.94])
@@ -356,7 +468,8 @@ def visualize_detection_results(image_url, regions, save_path=None):
             plt.show()
             print("🖼️  Interactive visualization displayed!")
             print("🔍 Use mouse wheel to zoom, click and drag to pan")
-            print("🔄 Right-click on image to reset zoom")
+            print("� Click on legend items to show/hide specific detections")
+            print("�🔄 Right-click on image to reset zoom")
             print("💾 Use the toolbar save button to export current view")
         else:
             print("🖼️  Large visualization saved as image file (display not available in this environment)")
@@ -369,6 +482,7 @@ def visualize_detection_results(image_url, regions, save_path=None):
     # Don't close immediately to allow interaction
     if backend != 'Agg':
         print("🔄 Close the window when you're done exploring to continue...")
+        print("💡 Try clicking legend items to toggle detection visibility!")
         # plt.close() will be called when user closes the window
 
 def create_detection_detail_view(image_url, regions, save_path=None):
@@ -616,6 +730,9 @@ print("   • Colored bounding boxes show detected object locations")
 print("   • Semi-transparent overlays preserve original image visibility")
 print("   • Interactive zoom allows detailed inspection of detection accuracy")
 print("   • Detail views show cropped regions around each detected object")
+print("   • Interactive legend enables selective viewing of detection classes")
+print("   • Click legend items to focus on specific types of objects")
+print("   • Toggle detection visibility for cleaner analysis")
 
 print(f"\n🧠 About logo detection:")
 print("   • Specialized model for finding brand logos and commercial identifiers")
@@ -640,11 +757,14 @@ print("   • Adjust bounding box overlay transparency")
 print("   • Customize the color palette for better visualization")
 print("   • Use mouse wheel to zoom into specific regions")
 print("   • Click and drag to pan around large images")
+print("   • Click legend items to show/hide specific detection classes")
 print("   • Save high-resolution views of interesting areas")
 print("   • Modify detail view cropping padding for closer/wider views")
 print("   • Save the detection results by uncommenting the save_path parameter")
 print("   • Filter results by confidence threshold")
 print("   • Add object size analysis and statistics")
 print("   • Create batch processing for multiple images")
+print("   • Customize legend appearance and positioning")
+print("   • Add keyboard shortcuts for bulk toggle operations")
 
 print(f"\n📚 Learn more at: https://docs.clarifai.com/getting-started/quickstart")

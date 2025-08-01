@@ -76,7 +76,7 @@ def draw_segmentation_regions(image, regions, show_labels=True):
         show_labels (bool): Whether to show concept labels on the image
         
     Returns:
-        PIL.Image: Image with segmentation regions drawn
+        tuple: (PIL.Image with regions drawn, list of color mappings)
     """
     # Create a copy of the image to draw on
     img_with_regions = image.copy()
@@ -91,8 +91,28 @@ def draw_segmentation_regions(image, regions, show_labels=True):
         except:
             font = ImageFont.load_default()
     
-    # Color palette for different regions
-    colors = ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'cyan', 'magenta']
+    # Enhanced color palette with distinct colors for better visibility
+    colors = [
+        '#FF0000',  # Bright Red
+        '#0000FF',  # Bright Blue  
+        '#00FF00',  # Bright Green
+        '#FF00FF',  # Magenta
+        '#00FFFF',  # Cyan
+        '#FFA500',  # Orange
+        '#800080',  # Purple
+        '#FFFF00',  # Yellow
+        '#FF69B4',  # Hot Pink
+        '#32CD32',  # Lime Green
+        '#FFD700',  # Gold
+        '#8A2BE2',  # Blue Violet
+        '#DC143C',  # Crimson
+        '#20B2AA',  # Light Sea Green
+        '#FF6347',  # Tomato
+        '#4682B4',  # Steel Blue
+    ]
+    
+    # Store color mappings for legend
+    color_mappings = []
     
     for i, region in enumerate(regions):
         # Get bounding box coordinates if available
@@ -106,29 +126,53 @@ def draw_segmentation_regions(image, regions, show_labels=True):
             right = int(bbox.right_col * img_width)
             bottom = int(bbox.bottom_row * img_height)
             
-            # Choose color for this region
+            # Choose unique color for this region
             color = colors[i % len(colors)]
             
-            # Draw bounding box
-            draw.rectangle([left, top, right, bottom], outline=color, width=3)
+            # Draw bounding box with thicker border for better visibility
+            draw.rectangle([left, top, right, bottom], outline=color, width=4)
             
-            if show_labels and region.data.concepts:
-                # Get the top concept for this region
+            # Get the top concept for this region
+            if region.data.concepts:
                 top_concept = region.data.concepts[0]
-                label = f"{top_concept.name} ({top_concept.value:.2f})"
+                concept_name = top_concept.name
+                confidence = top_concept.value
                 
-                # Draw label background
-                text_bbox = draw.textbbox((left, top-25), label, font=font)
-                draw.rectangle(text_bbox, fill=color)
+                # Store color mapping
+                color_mappings.append({
+                    'region_id': i + 1,
+                    'color': color,
+                    'concept': concept_name,
+                    'confidence': confidence
+                })
                 
-                # Draw label text
-                draw.text((left, top-25), label, fill='white', font=font)
+                if show_labels:
+                    label = f"R{i+1}: {concept_name} ({confidence:.2f})"
+                    
+                    # Calculate text size for background
+                    text_bbox = draw.textbbox((left, top-30), label, font=font)
+                    text_width = text_bbox[2] - text_bbox[0]
+                    text_height = text_bbox[3] - text_bbox[1]
+                    
+                    # Draw label background with some padding
+                    draw.rectangle([left-2, top-32, left+text_width+4, top-2], fill=color)
+                    
+                    # Draw label text in white for contrast
+                    draw.text((left, top-30), label, fill='white', font=font)
+            else:
+                # Store color mapping even if no concepts
+                color_mappings.append({
+                    'region_id': i + 1,
+                    'color': color,
+                    'concept': 'Unknown',
+                    'confidence': 0.0
+                })
     
-    return img_with_regions
+    return img_with_regions, color_mappings
 
 def visualize_segmentation_results(image_url, regions, save_path=None):
     """
-    Create a visualization showing the original image and segmented regions.
+    Create a visualization showing the original image and segmented regions with color legend.
     
     Args:
         image_url (str): URL of the original image
@@ -143,33 +187,72 @@ def visualize_segmentation_results(image_url, regions, save_path=None):
         print("❌ Could not download image for visualization")
         return
     
-    # Create image with segmentation regions
-    segmented_image = draw_segmentation_regions(original_image, regions)
+    # Create image with segmentation regions and get color mappings
+    segmented_image, color_mappings = draw_segmentation_regions(original_image, regions)
     
-    # Create a figure with two subplots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7))
+    # Create a figure with three subplots: original, segmented, and legend
+    fig = plt.figure(figsize=(20, 8))
     
-    # Display original image
+    # Create a grid layout: 2 columns for images, 1 for legend
+    gs = fig.add_gridspec(2, 3, width_ratios=[1, 1, 0.5], height_ratios=[1, 0.1])
+    
+    # Original image subplot
+    ax1 = fig.add_subplot(gs[:, 0])
     ax1.imshow(original_image)
-    ax1.set_title('Original Image', fontsize=14, fontweight='bold')
+    ax1.set_title('Original Image', fontsize=16, fontweight='bold', pad=20)
     ax1.axis('off')
     
-    # Display image with segmentation regions
+    # Segmented image subplot
+    ax2 = fig.add_subplot(gs[:, 1])
     ax2.imshow(segmented_image)
-    ax2.set_title('Segmented Regions', fontsize=14, fontweight='bold')
+    ax2.set_title('Segmented Regions', fontsize=16, fontweight='bold', pad=20)
     ax2.axis('off')
     
-    # Add a main title
-    fig.suptitle('Clarifai Image Segmentation Results', fontsize=16, fontweight='bold')
+    # Legend subplot
+    ax3 = fig.add_subplot(gs[:, 2])
+    ax3.axis('off')
+    ax3.set_title('Region Legend', fontsize=14, fontweight='bold', pad=20)
+    
+    # Create color legend
+    legend_y_start = 0.95
+    legend_y_step = 0.08
+    
+    for i, mapping in enumerate(color_mappings):
+        y_pos = legend_y_start - (i * legend_y_step)
+        
+        # Draw color square
+        color_square = plt.Rectangle((0.1, y_pos-0.02), 0.1, 0.04, 
+                                   facecolor=mapping['color'], 
+                                   edgecolor='black', linewidth=1)
+        ax3.add_patch(color_square)
+        
+        # Add text description
+        text = f"R{mapping['region_id']}: {mapping['concept']}\n     ({mapping['confidence']:.2f})"
+        ax3.text(0.25, y_pos, text, fontsize=10, va='center', ha='left')
+    
+    # Set legend limits
+    ax3.set_xlim(0, 1)
+    ax3.set_ylim(0, 1)
+    
+    # Add main title
+    fig.suptitle('Clarifai Image Segmentation Results with Color-Coded Regions', 
+                fontsize=18, fontweight='bold', y=0.95)
     
     # Adjust layout
     plt.tight_layout()
+    
+    # Print color mapping to console
+    print("\n🎨 Region Color Mapping:")
+    print("=" * 60)
+    for mapping in color_mappings:
+        print(f"🔷 Region {mapping['region_id']} ({mapping['color']}): {mapping['concept']} "
+              f"({mapping['confidence']:.2f} confidence)")
     
     # Determine if we should save the image
     backend = matplotlib.get_backend()
     if save_path is None and backend == 'Agg':
         # Non-interactive backend, auto-save
-        save_path = "segmentation_results.png"
+        save_path = "segmentation_results_with_legend.png"
     
     # Save if path provided or if using non-interactive backend
     if save_path:
@@ -186,8 +269,8 @@ def visualize_segmentation_results(image_url, regions, save_path=None):
     except Exception as e:
         print(f"⚠️  Could not display visualization: {e}")
         if not save_path:
-            plt.savefig("segmentation_results.png", dpi=300, bbox_inches='tight')
-            print("💾 Saved visualization to: segmentation_results.png")
+            plt.savefig("segmentation_results_with_legend.png", dpi=300, bbox_inches='tight')
+            print("💾 Saved visualization to: segmentation_results_with_legend.png")
     
     plt.close()  # Clean up the figure
 
@@ -240,12 +323,20 @@ regions = model_prediction.outputs[0].data.regions
 print(f"\n🎯 Found {len(regions)} segmented regions in the image:")
 print("=" * 50)
 
-# Iterate through each detected region
+# Enhanced color palette (same as in visualization function)
+color_names = [
+    'Bright Red', 'Bright Blue', 'Bright Green', 'Magenta', 'Cyan', 
+    'Orange', 'Purple', 'Yellow', 'Hot Pink', 'Lime Green', 
+    'Gold', 'Blue Violet', 'Crimson', 'Light Sea Green', 'Tomato', 'Steel Blue'
+]
+
+# Iterate through each detected region with color information
 for region_index, region in enumerate(regions, 1):
-    print(f"\n🔍 Region {region_index}:")
+    color_name = color_names[(region_index - 1) % len(color_names)]
+    print(f"\n� Region {region_index} ({color_name}):")
     
     # Each region can contain multiple concepts (detected objects/features)
-    for concept in region.data.concepts:
+    for concept_index, concept in enumerate(region.data.concepts):
         # Extract the concept name (what was detected)
         name = concept.name
         
@@ -253,9 +344,16 @@ for region_index, region in enumerate(regions, 1):
         # Values range from 0.0 (not confident) to 1.0 (very confident)
         confidence = round(concept.value, 4)  # Round to 4 decimal places for readability
         
-        # Display the results in a formatted way
+        # Display the results in a formatted way with ranking
         # The confidence represents how much of the region this concept covers
-        print(f"   • {name}: {confidence} ({confidence * 100:.2f}% confidence)")
+        rank_symbol = "👑" if concept_index == 0 else "  "  # Crown for top prediction
+        print(f"   {rank_symbol} {name}: {confidence} ({confidence * 100:.2f}% confidence)")
+    
+    # Show region location if available
+    if hasattr(region.region_info, 'bounding_box'):
+        bbox = region.region_info.bounding_box
+        print(f"      📍 Location: ({bbox.left_col:.2f}, {bbox.top_row:.2f}) to "
+              f"({bbox.right_col:.2f}, {bbox.bottom_row:.2f})")
 
 # =============================================================================
 # VISUAL DISPLAY: Show original image and segmented regions
@@ -264,7 +362,7 @@ print("\n🎨 Creating visual display of segmentation results...")
 try:
     # Display the original image alongside the segmented regions
     # Optionally save the visualization (uncomment the line below to save)
-    # visualize_segmentation_results(image_url, regions, save_path="segmentation_results.png")
+    # visualize_segmentation_results(image_url, regions, save_path="segmentation_with_color_legend.png")
     visualize_segmentation_results(image_url, regions)
 except Exception as e:
     print(f"⚠️  Could not display visualization: {e}")
@@ -281,26 +379,17 @@ print("   • Each region represents a different part of the image")
 print("   • Concepts show what objects/features were detected in each region")
 print("   • Confidence values indicate how certain the AI is about each detection")
 print("   • Higher values (closer to 1.0) mean higher confidence")
-
-# =============================================================================
-# SUMMARY AND NEXT STEPS
-# =============================================================================
-print("\n" + "=" * 50)
-print("✅ Image segmentation analysis complete!")
-print("\n💡 Understanding the results:")
-print("   • Each region represents a different part of the image")
-print("   • Concepts show what objects/features were detected in each region")
-print("   • Confidence values indicate how certain the AI is about each detection")
-print("   • Higher values (closer to 1.0) mean higher confidence")
-print("   • Colored bounding boxes in the visualization show detected regions")
+print("   • Each region has a unique color in the visualization")
+print("   • Color-coded legend shows region-to-prediction mapping")
 
 print("\n🚀 Try modifying this script:")
 print("   • Change the 'image_url' to analyze your own images")
 print("   • Try different segmentation models from Clarifai's model gallery")
-print("   • Modify the visualization colors or add more region details")
-print("   • Save the visualized results by uncommenting the save_path parameter")
+print("   • Customize the color palette for better visualization")
+print("   • Save the color-coded results by uncommenting the save_path parameter")
 print("   • Experiment with different image formats (JPG, PNG, etc.)")
 print("   • Add region area calculations or other analysis features")
-print("   • Create batch processing for multiple images")
+print("   • Create batch processing for multiple images with color legends")
+print("   • Modify the legend layout or add more detailed region information")
 
 print(f"\n📚 Learn more at: https://docs.clarifai.com/getting-started/quickstart")

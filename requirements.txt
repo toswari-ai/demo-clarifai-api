@@ -1,7 +1,23 @@
-openai>=1.0.0
+# Clarifai Demo Environment Requirements
+# Compatible with conda environments and Python 3.12
+# For setup instructions, see setup-env.sh
+
+# Core Clarifai SDK
 clarifai>=11.6.0
+
+# OpenAI compatibility for some examples
+openai>=1.0.0
+
+# Image processing and computer vision
 Pillow>=10.0.0
-numpy
-opencv-python
+opencv-python>=4.5.0
+numpy>=1.21.0
+
+# Visualization and matplotlib
 matplotlib>=3.5.0
-requests
+
+# HTTP requests for downloading images/data
+requests>=2.25.0
+
+# Additional utilities (typically included with Python but listed for completeness)
+# Note: os, json, base64, gc, io, datetime are part of Python standard library
